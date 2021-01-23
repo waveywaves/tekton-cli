@@ -16,6 +16,7 @@ package cli
 
 import (
 	"io"
+	"k8s.io/client-go/rest"
 	"net/http"
 
 	"github.com/jonboulle/clockwork"
@@ -39,6 +40,7 @@ type Clients struct {
 	Resource   versionedResource.Interface
 	HTTPClient http.Client
 	Dynamic    dynamic.Interface
+	RESTConfig rest.Config
 }
 
 // Params interface provides

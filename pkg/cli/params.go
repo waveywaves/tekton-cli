@@ -149,6 +149,7 @@ func (p *TektonParams) Clients() (*Clients, error) {
 		Resource: resource,
 		Triggers: triggers,
 		Dynamic:  dynamic,
+		RESTConfig: *config,
 	}
 
 	return p.clients, nil

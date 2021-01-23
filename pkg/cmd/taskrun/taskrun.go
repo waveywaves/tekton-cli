@@ -40,6 +40,7 @@ func Command(p cli.Params) *cobra.Command {
 		deleteCommand(p),
 		cancelCommand(p),
 		describeCommand(p),
+		debugCommand(p),
 	)
 
 	return cmd

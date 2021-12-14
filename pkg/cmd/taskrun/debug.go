@@ -16,29 +16,31 @@ package taskrun
 
 import (
 	"fmt"
+	"strings"
+
 	"github.com/AlecAivazis/survey/v2"
 	"github.com/spf13/cobra"
 	"github.com/tektoncd/cli/pkg/cli"
 	"github.com/tektoncd/cli/pkg/formatted"
 	"github.com/tektoncd/cli/pkg/options"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/remotecommand"
-	"strings"
 	trlist "github.com/tektoncd/cli/pkg/taskrun/list"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/remotecommand"
+
 	// "github.com/tektoncd/cli/pkg/debug"
 	tr "github.com/tektoncd/cli/pkg/taskrun"
 	corev1 "k8s.io/api/core/v1"
 )
 
 type DebugOptions struct {
-	Params          cli.Params
-	TaskrunName     string
+	Params           cli.Params
+	TaskrunName      string
 	DebugTaskrunName string
-	Last bool
-	Limit int
-	AskOpts survey.AskOpt
-	Stream *cli.Stream
+	Last             bool
+	Limit            int
+	AskOpts          survey.AskOpt
+	Stream           *cli.Stream
 }
 
 func (opts *DebugOptions) ValidateOpts() error {
@@ -73,7 +75,7 @@ func (opts *DebugOptions) Ask(resource string, options []string) error {
 	//	opts.TaskName = ans
 	case "taskrun":
 		opts.TaskrunName = strings.Fields(ans)[0]
-		opts.DebugTaskrunName = strings.Fields(ans)[0]+"-debug"
+		opts.DebugTaskrunName = strings.Fields(ans)[0] + "-debug"
 	}
 
 	return nil
@@ -101,7 +103,7 @@ Rerun and debug a TaskRun named 'foo' from the namespace 'bar':
 			}
 
 			opts.Stream = &cli.Stream{
-				In: cmd.InOrStdin(),
+				In:  cmd.InOrStdin(),
 				Out: cmd.OutOrStdout(),
 				Err: cmd.OutOrStderr(),
 			}
@@ -128,7 +130,7 @@ func runDebug(opts *DebugOptions) error {
 
 	cs, _ := opts.Params.Clients()
 
-	taskrun, err := tr.GetV1beta1(cs, opts.TaskrunName, metav1.GetOptions{}, "default")
+	taskrun, err := tr.GetV1beta1(cs, opts.TaskrunName, metav1.GetOptions{}, opts.Params.Namespace())
 	if err != nil {
 		return err
 	}
@@ -139,41 +141,40 @@ func runDebug(opts *DebugOptions) error {
 	}
 
 	execOptions := &corev1.PodExecOptions{
-		Command: command,
-		Stdin: true,
-		Stdout: true,
-		Stderr: true,
-		TTY: true,
+		Command:   command,
+		Stdin:     true,
+		Stdout:    true,
+		Stderr:    true,
+		TTY:       true,
 		Container: "step-breakpoint",
 	}
 
-	request := cs.Kube.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace("default").
+	request := cs.Kube.CoreV1().RESTClient().Post().Resource("pods").Name(podName).Namespace(opts.Params.Namespace()).
 		SubResource("exec").
-		Param("command","sh").
-		Param("container", "step-breakpoint").
-		Param("stdin","true").
-		Param("stdout","true").
-		Param("tty","true")
+		Param("command", "bash").
+		Param("container", "step-"+taskrun.Status.TaskSpec.Steps[0].Name).
+		Param("stdin", "true").
+		Param("stdout", "true").
+		Param("tty", "true")
 
 	request.VersionedParams(execOptions, runtime.NewParameterCodec(runtime.NewScheme()))
 
 	exec, err := remotecommand.NewSPDYExecutor(&cs.RESTConfig, "POST", request.URL())
 	if err != nil {
-		return err
+		return fmt.Errorf("error while creating SPDYExecutor: %s",err.Error())
 	}
 
 	fmt.Println(request.URL().String())
 
 	err = exec.Stream(remotecommand.StreamOptions{
-		Stdin: opts.Stream.In,
+		Stdin:  opts.Stream.In,
 		Stdout: opts.Stream.Out,
 		Stderr: opts.Stream.Err,
-		Tty: true,
+		Tty:    true,
 	})
 	if err != nil {
-		return fmt.Errorf("error in Stream: %v", err)
+		return fmt.Errorf("error in Stream: %v", err.Error())
 	}
-
 
 	//d, err := debug.NewDebugger()
 	//if err != nil {
@@ -202,7 +203,7 @@ func askRunNameForDebug(opts *DebugOptions) error {
 
 	if len(trs) == 1 || opts.Last {
 		opts.TaskrunName = strings.Fields(trs[0])[0]
-		opts.DebugTaskrunName = opts.TaskrunName+"-debug"
+		opts.DebugTaskrunName = opts.TaskrunName + "-debug"
 		return nil
 	}
 
